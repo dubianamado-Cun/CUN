@@ -1,0 +1,5 @@
+{
+  "name": "Informe tickects",
+  "description": "An interactive web application to upload, process, and analyze ticket management datasets. It features statistical analysis, text analysis powered by Gemini, and comprehensive visualizations to derive insights from support tickets.",
+  "requestFramePermissions": []
+}
