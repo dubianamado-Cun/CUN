@@ -4,6 +4,7 @@ import LineChart from '../charts/LineChart';
 import StackedBarChart from '../charts/StackedBarChart';
 import Heatmap from '../charts/Heatmap';
 import ChartLoader from '../ui/ChartLoader';
+import AIInsight from './AIInsight';
 
 interface TemporalAnalysisProps {
   processedData: any;
@@ -29,6 +30,36 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ processedData, isPr
     const stackedBarChartTitle = compareYears
         ? 'Comparación Anual: Volumen de Tickets por Mes'
         : `Tickets por Estado por ${ { monthly: 'Mes', weekly: 'Semana', daily: 'Día' }[stackedBarPeriod] }`;
+
+    const generatePrompt = () => {
+        if (!processedData) return "";
+
+        const peakDayHour = () => {
+            const grid = heatmapData?.current;
+            if (!grid) return "No disponible";
+            let maxVal = -1;
+            let day = -1;
+            let hour = -1;
+            grid.forEach((row: number[], dayIndex: number) => {
+                row.forEach((val: number, hourIndex: number) => {
+                    if (val > maxVal) {
+                        maxVal = val;
+                        day = dayIndex;
+                        hour = hourIndex;
+                    }
+                });
+            });
+            const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+            return `${dayNames[day]} a las ${hour}:00`;
+        };
+        
+        let promptText = "Analiza las siguientes tendencias temporales de tickets de soporte y proporciona una conclusión en español (3-4 frases) sobre la gestión de la carga de trabajo.\n\n";
+        promptText += `- Los volúmenes mensuales de tickets creados vs. resueltos muestran una tendencia. ${compareYears ? `Compara el año ${comparisonYears?.current} con el ${comparisonYears?.previous}.` : ''}\n`;
+        promptText += `- Los picos de carga de creación de tickets ocurren principalmente sobre esta hora y día: ${peakDayHour()}.\n`;
+        promptText += "Comenta sobre la estacionalidad, los patrones diarios/semanales y si la capacidad de resolución parece ajustarse a la demanda de creación.";
+
+        return promptText;
+    };
 
     return (
         <div>
@@ -70,6 +101,14 @@ const TemporalAnalysis: React.FC<TemporalAnalysisProps> = ({ processedData, isPr
                     )}
                 </Card>
             </div>
+            {!isProcessing && (
+                <Card className="mt-6">
+                    <AIInsight
+                        prompt={generatePrompt()}
+                        title="Análisis"
+                    />
+                </Card>
+            )}
         </div>
     );
 };

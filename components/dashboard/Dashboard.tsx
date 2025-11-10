@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Ticket } from '../../types';
 import Sidebar from './Sidebar';
@@ -9,13 +7,13 @@ import ClassificationAnalysis from './ClassificationAnalysis';
 import OperationalEfficiency from './OperationalEfficiency';
 import TextAnalysisAsunto from './TextAnalysisAsunto';
 import CorrelationAnalysis from './CorrelationAnalysis';
-import AutomatedSummary from './AutomatedSummary';
+import GeneralAnalysis from './GeneralAnalysis';
 import FilterPanel from './FilterPanel';
 import AIQueryModal from './AIQueryModal';
 import { BarChart2, Clock, Grid, Zap, Type, GitMerge, BrainCircuit, Filter, MessageSquare } from 'lucide-react';
 import ToggleSwitch from '../ui/ToggleSwitch';
 import Loader from '../ui/Loader';
-import { calculateExecutiveSummaryKpis, calculateTemporalAnalysisData, calculateClassificationData, calculateOperationalEfficiencyData, calculateTextAnalysisAsuntoData } from '../../utils/dataProcessing';
+import { calculateExecutiveSummaryKpis, calculateTemporalAnalysisData, calculateClassificationData, calculateOperationalEfficiencyData, calculateTextAnalysisAsuntoData, getCorrelationData } from '../../utils/dataProcessing';
 
 interface DashboardProps {
   data: Ticket[];
@@ -30,7 +28,7 @@ const NAV_ITEMS = [
     { id: 'operational-efficiency', label: 'Eficiencia Operativa', icon: Zap },
     { id: 'text-analysis-asunto', label: 'Análisis de Asunto', icon: Type },
     { id: 'correlation-analysis', label: 'Correlaciones y Patrones', icon: GitMerge },
-    { id: 'automated-summary', label: 'Conclusiones Automáticas', icon: BrainCircuit },
+    { id: 'general-analysis', label: 'Análisis General', icon: BrainCircuit },
 ];
 
 const getAvailableFilters = (data: Ticket[]): { [key: string]: string[] } => {
@@ -120,6 +118,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, fileName, onReset }) => {
                 classification: calculateClassificationData(filteredData, compareYears, comparisonYears),
                 operationalEfficiency: calculateOperationalEfficiencyData(filteredData, compareYears, comparisonYears),
                 textAnalysisAsunto: calculateTextAnalysisAsuntoData(filteredData),
+                correlationAnalysis: getCorrelationData(filteredData),
             };
             setProcessedData(allProcessedData);
             setIsProcessing(false);
@@ -239,10 +238,22 @@ const Dashboard: React.FC<DashboardProps> = ({ data, fileName, onReset }) => {
                         <TextAnalysisAsunto 
                             processedData={processedData?.textAnalysisAsunto}
                             isProcessing={isProcessing}
+                            fullDataset={filteredData}
                         />
                     </section>
-                    <section id="correlation-analysis"><CorrelationAnalysis /></section>
-                    <section id="automated-summary"><AutomatedSummary /></section>
+                    <section id="correlation-analysis">
+                        <CorrelationAnalysis 
+                            processedData={processedData?.correlationAnalysis}
+                            isProcessing={isProcessing}
+                            fullDataset={filteredData}
+                        />
+                    </section>
+                    <section id="general-analysis">
+                        <GeneralAnalysis 
+                            processedData={processedData}
+                            isProcessing={isProcessing}
+                        />
+                    </section>
                 </div>
             </main>
             <button 

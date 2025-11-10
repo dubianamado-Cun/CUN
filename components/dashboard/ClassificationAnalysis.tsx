@@ -4,6 +4,7 @@ import Treemap from '../charts/Treemap';
 import HorizontalBarChart from '../charts/HorizontalBarChart';
 import CrosstabTable from '../charts/CrosstabTable';
 import ChartLoader from '../ui/ChartLoader';
+import AIInsight from './AIInsight';
 
 interface ClassificationAnalysisProps {
   processedData: any;
@@ -15,6 +16,24 @@ interface ClassificationAnalysisProps {
 const ClassificationAnalysis: React.FC<ClassificationAnalysisProps> = ({ processedData, isProcessing, compareYears, comparisonYears }) => {
 
     const { treemapData, topCategoriesData, crosstabData } = processedData || {};
+
+    const generatePrompt = () => {
+        if (!processedData) return "";
+
+        const topCategoriesList = topCategoriesData?.slice(0, 3).map((c: any) => c.name).join(', ');
+        const mainCategory = treemapData?.current?.children?.[0];
+        const mainSubcategories = mainCategory?.children?.slice(0, 2).map((sc: any) => sc.name).join(' y ');
+        
+        let promptText = "Analiza los siguientes datos de clasificación de tickets y sintetiza los puntos en un análisis en español (3-4 frases) que identifique los tipos de solicitudes más impactantes.\n\n";
+        promptText += `- Las principales categorías por volumen de tickets son: ${topCategoriesList}.\n`;
+        if (mainCategory && mainSubcategories) {
+            promptText += `- La categoría más grande, "${mainCategory.name}", se concentra principalmente en las subcategorías: ${mainSubcategories}.\n`;
+        }
+        promptText += "- La matriz de estado muestra la distribución de tickets por categoría y su estado actual.\n\n";
+        promptText += `Busca patrones interesantes, como una categoría con un número desproporcionado de tickets en un estado específico (ej. "Pendiente" o "En Progreso") y menciona qué podría significar.`;
+
+        return promptText;
+    };
 
     return (
         <div>
@@ -42,6 +61,14 @@ const ClassificationAnalysis: React.FC<ClassificationAnalysisProps> = ({ process
                    {isProcessing ? <ChartLoader /> : <CrosstabTable data={crosstabData} />}
                 </Card>
             </div>
+            {!isProcessing && (
+                <Card className="mt-6">
+                    <AIInsight
+                        prompt={generatePrompt()}
+                        title="Análisis"
+                    />
+                </Card>
+            )}
         </div>
     );
 };

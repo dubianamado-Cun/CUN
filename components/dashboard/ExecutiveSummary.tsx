@@ -9,7 +9,7 @@ import {
     Smile 
 } from 'lucide-react';
 import Card from '../ui/Card';
-import ChartLoader from '../ui/ChartLoader';
+import AIInsight from './AIInsight';
 
 interface ExecutiveSummaryProps {
   processedData: any; // Data is now pre-processed
@@ -75,6 +75,34 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ processedData, isPr
         },
     ];
 
+    const generatePrompt = () => {
+        if (!processedData) return "";
+
+        let promptText = "Analiza los siguientes KPIs de un dashboard de tickets de soporte y proporciona una conclusión concisa en español (3-4 frases) sobre la salud general del servicio de soporte.\n\n";
+
+        if (compareYears && comparisonKpis) {
+            promptText += `Año Actual (${comparisonYears?.current}):\n`;
+            promptText += `- Total de Tickets: ${comparisonKpis.current.totalTickets.toLocaleString()}\n`;
+            promptText += `- % Cerrados: ${comparisonKpis.current.percentageClosed.toFixed(1)}%\n`;
+            promptText += `- Tiempo Prom. Resolución: ${comparisonKpis.current.avgResolutionHours.toFixed(1)} hs\n\n`;
+            promptText += `Año Anterior (${comparisonYears?.previous}):\n`;
+            promptText += `- Total de Tickets: ${comparisonKpis.previous.totalTickets.toLocaleString()}\n`;
+            promptText += `- % Cerrados: ${comparisonKpis.previous.percentageClosed.toFixed(1)}%\n`;
+            promptText += `- Tiempo Prom. Resolución: ${comparisonKpis.previous.avgResolutionHours.toFixed(1)} hs\n\n`;
+            promptText += "Enfócate en las tendencias y cambios más importantes entre los dos años.";
+        } else if (kpiData) {
+            promptText += `KPIs Generales:\n`;
+            promptText += `- Total de Tickets: ${kpiData.totalTickets.toLocaleString()}\n`;
+            promptText += `- % Cerrados: ${kpiData.percentageClosed.toFixed(1)}%\n`;
+            promptText += `- Tiempo Prom. Resolución: ${kpiData.avgResolutionHours.toFixed(1)} hs\n`;
+            promptText += `- Tasa FCR: ${kpiData.fcrRate.toFixed(1)}%\n`;
+            promptText += `- Reasignaciones Prom.: ${kpiData.avgReassignments.toFixed(2)}\n`;
+        }
+        
+        return promptText;
+    };
+
+
     return (
         <div>
             <h2 className="text-3xl font-bold text-text-primary mb-2">Resumen Ejecutivo</h2>
@@ -100,6 +128,14 @@ const ExecutiveSummary: React.FC<ExecutiveSummaryProps> = ({ processedData, isPr
                     ))
                 )}
             </div>
+            {!isProcessing && (
+                 <Card className="mt-6">
+                    <AIInsight
+                        prompt={generatePrompt()}
+                        title="Análisis"
+                    />
+                </Card>
+            )}
         </div>
     );
 };

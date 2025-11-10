@@ -2,6 +2,28 @@ import { Ticket } from '../types';
 import { getMonthYear, getDayOfWeek, getWeekYear, getDateString, MONTH_NAMES_SHORT } from './dateUtils';
 
 // ==================================
+// UTILS
+// ==================================
+const getResolutionHours = (ticket: Ticket): number | null => {
+    if (!ticket.creation_time || !ticket.modification_time) return null;
+    
+    const isClosed = ticket.status?.toLowerCase().includes('closed') || ticket.status?.toLowerCase().includes('cerrado');
+    if (!isClosed) return null;
+
+    const diff = ticket.modification_time.getTime() - ticket.creation_time.getTime();
+    return diff > 0 ? diff / (1000 * 60 * 60) : 0;
+}
+
+const groupBy = <T, K extends keyof any>(list: T[], getKey: (item: T) => K) =>
+  list.reduce((previous, currentItem) => {
+    const group = getKey(currentItem);
+    if (!previous[group]) previous[group] = [];
+    previous[group].push(currentItem);
+    return previous;
+  }, {} as Record<K, T[]>);
+
+
+// ==================================
 // EXECUTIVE SUMMARY
 // ==================================
 const calculateKpis = (dataset: Ticket[]) => {
@@ -571,4 +593,106 @@ export const calculateTextAnalysisAsuntoData = (data: Ticket[]) => {
         .sort((a, b) => b.count - a.count);
 
     return { topExpressions, expressionTrends, expressionExamples: sortedExpressionExamples, top5ExpressionTexts };
+};
+
+// ==================================
+// CORRELATION & PATTERN ANALYSIS
+// ==================================
+export const getCorrelationData = (data: Ticket[]) => {
+    // 1. Scatter Plot Data: Resolution Time vs. Reassignments
+    const scatterPlotData = data
+        .map(ticket => {
+            const resolutionTimeHours = getResolutionHours(ticket);
+            const reassignments = typeof ticket.reassignments === 'number' ? ticket.reassignments : null;
+            if (resolutionTimeHours !== null && reassignments !== null) {
+                return {
+                    x: reassignments,
+                    y: resolutionTimeHours,
+                    label: `Ticket ID: ${ticket.id || 'N/A'}`
+                };
+            }
+            return null;
+        })
+        .filter((d): d is { x: number; y: number; label: string } => d !== null);
+
+    // 2. Top Categories by Avg Resolution Time
+    const categoriesWithTime = data.map(t => ({
+        category: t.category || 'Sin Categoría',
+        time: getResolutionHours(t),
+    })).filter(d => d.time !== null);
+    
+    const groupedByCategory = groupBy(categoriesWithTime, t => t.category);
+    
+    const topCategoriesByTimeData = Object.entries(groupedByCategory).map(([category, tickets]) => {
+        const totalHours = tickets.reduce((sum, t) => sum + (t.time || 0), 0);
+        return {
+            name: category,
+            value: totalHours / tickets.length
+        };
+    })
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 10);
+
+
+    // 3. Sentiment vs. Resolution Time
+    const sentimentTimeData = (() => {
+        const ticketsWithSentimentAndTime = data.map(t => {
+            const sentimentRaw = t.sentiment?.toString().toLowerCase() || 'neutral';
+            let sentiment: 'positive' | 'negative' | 'neutral' = 'neutral';
+            if (sentimentRaw.includes('positive')) sentiment = 'positive';
+            else if (sentimentRaw.includes('negative')) sentiment = 'negative';
+
+            return {
+                sentiment,
+                time: getResolutionHours(t)
+            };
+        }).filter(d => d.time !== null);
+
+        const groupedBySentiment = groupBy(ticketsWithSentimentAndTime, t => t.sentiment);
+        
+        const calcAvg = (sentiment: 'positive' | 'negative' | 'neutral') => {
+            const group = groupedBySentiment[sentiment];
+            if (!group || group.length === 0) return 0;
+            const totalHours = group.reduce((sum, t) => sum + (t.time || 0), 0);
+            return totalHours / group.length;
+        };
+
+        return {
+            positive: calcAvg('positive'),
+            negative: calcAvg('negative'),
+            neutral: calcAvg('neutral'),
+        };
+    })();
+
+    // 4. Outlier Identification
+    const outlierTicketsData = (() => {
+        const ticketsWithMetrics = data.map(ticket => {
+            const resolutionTimeHours = getResolutionHours(ticket);
+            const reassignments = typeof ticket.reassignments === 'number' ? ticket.reassignments : 0;
+            return { ticket, resolutionTimeHours, reassignments };
+        }).filter(d => d.resolutionTimeHours !== null);
+        
+        if (ticketsWithMetrics.length < 5) return [];
+
+        const avgTime = ticketsWithMetrics.reduce((sum, d) => sum + d.resolutionTimeHours!, 0) / ticketsWithMetrics.length;
+        const avgReassignments = ticketsWithMetrics.reduce((sum, d) => sum + d.reassignments, 0) / ticketsWithMetrics.length || 1;
+
+        return ticketsWithMetrics.map(d => {
+                const timeScore = d.resolutionTimeHours! / avgTime;
+                const reassignScore = d.reassignments / avgReassignments;
+                // Simple scoring: prioritize very long times, then high reassignments
+                const score = (timeScore * 1.5) + reassignScore;
+                return { ...d.ticket, resolutionTimeHours: d.resolutionTimeHours, reassignments: d.reassignments, score };
+            })
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)
+            .filter(t => t.score > 2.5); // Only show if score is significantly high
+    })();
+
+    return {
+        scatterPlotData,
+        topCategoriesByTimeData,
+        sentimentTimeData,
+        outlierTicketsData,
+    };
 };

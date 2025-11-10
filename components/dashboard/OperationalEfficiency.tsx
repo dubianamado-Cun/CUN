@@ -5,6 +5,7 @@ import Card from '../ui/Card';
 import ScatterPlot from '../charts/ScatterPlot';
 import HorizontalBarChart from '../charts/HorizontalBarChart';
 import ChartLoader from '../ui/ChartLoader';
+import AIInsight from './AIInsight';
 
 interface OperationalEfficiencyProps {
   processedData: any;
@@ -16,6 +17,24 @@ interface OperationalEfficiencyProps {
 const OperationalEfficiency: React.FC<OperationalEfficiencyProps> = ({ processedData, isProcessing, compareYears, comparisonYears }) => {
     
     const { overallStats, agentPerformanceData, barChartData, scatterPlotData } = processedData || {};
+
+    const generatePrompt = () => {
+        if (!processedData) return "";
+        
+        const slaRate = overallStats?.current?.slaRate?.toFixed(1);
+        const topAgents = barChartData?.slice(0, 3).map((a: any) => a.name).join(', ');
+        const efficientAgentExample = scatterPlotData?.filter((d: any) => d.x > (scatterPlotData.reduce((s: number, p: any) => s + p.x, 0) / scatterPlotData.length) && d.y < (scatterPlotData.reduce((s: number, p: any) => s + p.y, 0) / scatterPlotData.length))[0];
+
+        let promptText = "Analiza los siguientes datos de eficiencia operativa y proporciona un resumen en español (3-4 frases).\n\n";
+        promptText += `- La tasa de cumplimiento de SLA global es del ${slaRate}%.\n`;
+        promptText += `- Los agentes con mayor volumen de tickets gestionados son: ${topAgents}.\n`;
+        if (efficientAgentExample) {
+           promptText += `- El gráfico de dispersión muestra agentes eficientes, por ejemplo, ${efficientAgentExample.label} manejó ${efficientAgentExample.x} tickets con un tiempo promedio de ${efficientAgentExample.y.toFixed(1)} hs.\n`;
+        }
+        promptText += `\nComenta sobre la eficiencia general del equipo. Destaca patrones notables entre los agentes, como la relación entre el volumen de trabajo y el tiempo de resolución, y si los agentes con más tickets mantienen un buen cumplimiento de SLA.`;
+
+        return promptText;
+    };
 
     return (
         <div>
@@ -98,6 +117,14 @@ const OperationalEfficiency: React.FC<OperationalEfficiencyProps> = ({ processed
                     )}
                 </Card>
             </div>
+            {!isProcessing && (
+                <Card className="mt-6">
+                    <AIInsight
+                        prompt={generatePrompt()}
+                        title="Análisis"
+                    />
+                </Card>
+            )}
         </div>
     );
 };
